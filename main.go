@@ -24,17 +24,20 @@ type Todo struct {
 }
 
 func (s *Server) FindByID(c *gin.Context) {
-	name := c.Param("id")
+	id := c.Param("id")
+	queryStmt := "SELECT id, todo, updated_at, created_at FROM todos where id=$1"
+	row := s.db.QueryRow(queryStmt, id)
 	var todo Todo
-	queryStmt := "SELECT id, todo, updated_at, created_at FROM todos where id = $1"
-	row := s.db.QueryRow(queryStmt, name)
-
 	err := row.Scan(&todo.ID, &todo.Body, &todo.UpdatedAt, &todo.CreatedAt)
 	if err != nil {
-		log.Fatal(err)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+			"object":  "error",
+			"message": fmt.Sprintf("db: query error: %s", err),
+		})
+		return
 	}
-	c.JSON(http.StatusOK, todo)
 
+	c.JSON(http.StatusOK, todo)
 }
 
 func (s *Server) All(c *gin.Context) {
@@ -111,7 +114,7 @@ func main() {
 	r := gin.Default()
 	r.GET("/todos", s.All)
 	r.POST("/todos", s.Create)
-	r.GET("/todo/:name", s.FindByID)
+	r.GET("/todos/:id", s.FindByID)
 
 	r.Run(":" + os.Getenv("PORT"))
 }
