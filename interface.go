@@ -7,7 +7,7 @@ type TodoService interface {
 	All() ([]model.Todo, error)
 	Create(todo *model.Todo) error
 	FindByID(id int) (*model.Todo, error)
-	DeleteByID(id int) error
+	DeleteByID(id int) ([]model.Todo, error)
 	Update(id int, body string) (*model.Todo, error)
 }
 

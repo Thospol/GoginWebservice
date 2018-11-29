@@ -55,13 +55,18 @@ func (s *TodoServiceImp) FindByID(id int) (*model.Todo, error) {
 }
 
 //DeleteByID is Medthod of TodoServiceImp
-func (s *TodoServiceImp) DeleteByID(id int) error {
+func (s *TodoServiceImp) DeleteByID(id int) ([]model.Todo, error) {
+
 	stmt := "DELETE FROM todos WHERE id = $1"
 	_, err := s.db.Exec(stmt, id)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	todos, err := s.All()
+	if err != nil {
+		return nil, err
+	}
+	return todos, nil
 }
 
 //Update is Medthod of TodoServiceImp

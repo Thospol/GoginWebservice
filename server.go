@@ -86,11 +86,13 @@ func (s *Server) Update(c *gin.Context) {
 func (s *Server) DeleteByID(c *gin.Context) {
 
 	id, _ := strconv.Atoi(c.Param("id"))
-	err := s.todoService.DeleteByID(id)
+	todos, err := s.todoService.DeleteByID(id)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 		return
 	}
+	c.JSON(http.StatusOK, todos)
+
 }
 
 //CreateSecret is Medthod of Server
