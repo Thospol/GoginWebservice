@@ -1,14 +1,8 @@
 package main
 
 import (
-	"database/sql"
 	"todos/model"
 )
-
-// SecretServiceImp is struct
-type SecretServiceImp struct {
-	db *sql.DB
-}
 
 //Insert is Medthod of SecretServiceImp
 func (s *SecretServiceImp) Insert(secret *model.Secret) error {

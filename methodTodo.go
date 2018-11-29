@@ -1,15 +1,9 @@
 package main
 
 import (
-	"database/sql"
 	"time"
 	"todos/model"
 )
-
-//TodoServiceImp is struct
-type TodoServiceImp struct {
-	db *sql.DB
-}
 
 //All is Medthod of TodoServiceImp
 func (s *TodoServiceImp) All() ([]model.Todo, error) {
