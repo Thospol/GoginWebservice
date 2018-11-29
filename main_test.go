@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+	"todos/model"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -12,8 +13,8 @@ import (
 type fakeTodoService struct {
 }
 
-func (f *fakeTodoService) All() ([]Todo, error) {
-	return []Todo{
+func (s *fakeTodoService) All() ([]model.Todo, error) {
+	return []model.Todo{
 		{
 			ID:        1,
 			Body:      "Todo",
@@ -24,10 +25,10 @@ func (f *fakeTodoService) All() ([]Todo, error) {
 }
 
 func TestAll(t *testing.T) {
-	s := &Server{
-		service: &fakeTodoService{},
+	services := &Server{
+		//todoService: &fakeTodoService{},
 	}
-	r := SetupRoute(s)
+	r := initializeRoutes(services)
 	req, _ := http.NewRequest(http.MethodGet, "http://localhost:8080/todos", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)

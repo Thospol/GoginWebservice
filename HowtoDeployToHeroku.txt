@@ -1,0 +1,7 @@
+git init
+git add .
+git commit -m “add to..”
+heroku login
+heroku create
+heroku addons:create heroku-postgresql:hobby-dev
+git push heroku master
