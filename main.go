@@ -255,6 +255,14 @@ func (s *Server) CreateSecret(c *gin.Context) {
 
 func (s *Server) AuthTodo(c *gin.Context) {
 
+	user, _, ok := c.Request.BasicAuth()
+	if ok {
+		row := s.db.QueryRow("SELECT key FROM secrets WHERE key = $1", user)
+		if err := row.Scan(&user); err == nil {
+			return
+		}
+	}
+	c.AbortWithStatus(http.StatusUnauthorized)
 }
 
 func main() {
@@ -323,14 +331,14 @@ func SetupRoute(s *Server) *gin.Engine {
 	// 	c.AbortWithStatus(http.StatusUnauthorized)
 	// })
 	todos.Use(s.AuthTodo)
-	todos.GET("/todos", s.All)
-	todos.POST("/todos", s.Create)
-	todos.GET("/todos/:id", s.FindByID)
-	todos.PUT("/todos/:id", s.Update)
-	todos.DELETE("/todos/:id", s.DeleteByID)
+	todos.GET("/", s.All)
+	todos.POST("/", s.Create)
+	todos.GET("/:id", s.FindByID)
+	todos.PUT("/:id", s.Update)
+	todos.DELETE("/:id", s.DeleteByID)
 
 	// curl -XPOST http://localhost:8000/admin/secrets
 	//  -u admin:1234 -d '{"key": "foobar"}
-	r.POST("/admin/secrets", s.CreateSecret)
+	admin.POST("/admin/secrets", s.CreateSecret)
 	return r
 }
