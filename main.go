@@ -233,7 +233,12 @@ func main() {
 		created_at TIMESTAMP WITHOUT TIME ZONE,
 		updated_at TIMESTAMP WITHOUT TIME ZONE
 	);
+	CREATE TABLE IF NOT EXISTS secrets (
+		id SERIAL PRIMARY KEY,
+		key TEXT
+	);
 	`
+
 	if _, err := db.Exec(createTable); err != nil {
 		log.Fatal(err)
 	}
@@ -255,21 +260,27 @@ func main() {
 func SetupRoute(s *Server) *gin.Engine {
 
 	r := gin.Default()
-	r.Use(func(c *gin.Context) {
-		user, pass, ok := c.Request.BasicAuth()
-		if ok {
-			if user == "foo" && pass == "pass" {
-				c.Set(gin.AuthUserKey, user)
-				return
-			}
-		}
-		c.AbortWithStatus(http.StatusUnauthorized)
-	})
+	todos := r.Group("/todos")
+	admin := r.Group("/admin")
+	admin.Use(gin.BasicAuth(gin.Accounts{
+		"admin": "1234",
+	}))
 
-	r.GET("/todos", s.All)
-	r.POST("/todos", s.Create)
-	r.GET("/todos/:id", s.FindByID)
-	r.PUT("/todos/:id", s.Update)
-	r.DELETE("/todos/:id", s.DeleteByID)
+	// r.Use(func(c *gin.Context) {
+	// 	user, pass, ok := c.Request.BasicAuth()
+	// 	if ok {
+	// 		if user == "foo" && pass == "pass" {
+	// 			c.Set(gin.AuthUserKey, user)
+	// 			return
+	// 		}
+	// 	}
+	// 	c.AbortWithStatus(http.StatusUnauthorized)
+	// })
+
+	todos.GET("/todos", s.All)
+	todos.POST("/todos", s.Create)
+	todos.GET("/todos/:id", s.FindByID)
+	todos.PUT("/todos/:id", s.Update)
+	todos.DELETE("/todos/:id", s.DeleteByID)
 	return r
 }
