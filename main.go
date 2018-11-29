@@ -42,7 +42,7 @@ func (s *TodoServiceImp) All() ([]Todo, error) {
 	return todos, nil
 }
 
-func (s *TodoServiceImp) Insert(todo *Todo) error {
+func (s *TodoServiceImp) Create(todo *Todo) error {
 	now := time.Now()
 	todo.CreatedAt = now
 	todo.UpdatedAt = now
@@ -54,7 +54,7 @@ func (s *TodoServiceImp) Insert(todo *Todo) error {
 	return nil
 }
 
-func (s *TodoServiceImp) GetByID(id int) (*Todo, error) {
+func (s *TodoServiceImp) FindByID(id int) (*Todo, error) {
 	stmt := "SELECT id, todo, created_at, updated_at FROM todos WHERE id = $1"
 	row := s.db.QueryRow(stmt, id)
 	var todo Todo
@@ -80,7 +80,7 @@ func (s *TodoServiceImp) Update(id int, body string) (*Todo, error) {
 	if err != nil {
 		return nil, err
 	}
-	return s.GetByID(id)
+	return s.FindByID(id)
 }
 
 type Server struct {
@@ -113,29 +113,6 @@ func (s *Server) FindByID(c *gin.Context) {
 }
 
 func (s *Server) All(c *gin.Context) {
-	// rows, err := s.db.Query("SELECT id, todo, updated_at, created_at FROM todos")
-	// if err != nil {
-	// 	c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
-	// 		"object":  "error",
-	// 		"message": fmt.Sprintf("db: query error: %s", err),
-	// 	})
-	// 	return
-	// }
-	// todos := []Todo{} // set empty slice without nil
-	// for rows.Next() {
-	// 	var todo Todo
-	// 	err := rows.Scan(&todo.ID, &todo.Body, &todo.UpdatedAt, &todo.CreatedAt)
-	// 	if err != nil {
-	// 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
-	// 			"object":  "error",
-	// 			"message": fmt.Sprintf("db: query error: %s", err),
-	// 		})
-	// 		return
-	// 	}
-	// 	todos = append(todos, todo)
-	// }
-	// c.JSON(http.StatusOK, todos)
-
 	todos, err := s.service.All()
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
@@ -261,8 +238,14 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// s := &Server{
+	// 	db: db,
+	// }
+
 	s := &Server{
-		db: db,
+		service: &TodoServiceImp{
+			db: db,
+		},
 	}
 
 	r := SetupRoute(s)
