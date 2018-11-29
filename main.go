@@ -21,6 +21,136 @@ type TodoService interface {
 	Update(id int, body string) (*Todo, error)
 }
 
+// type Server struct {
+// 	db      *sql.DB
+// 	service TodoService
+// }
+
+type Server struct {
+	db            *sql.DB
+	todoService   TodoService
+	secretService SecretService
+}
+
+func (s *Server) FindByID(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	todo, err := s.todoService.FindByID(id)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+		return
+	}
+	c.JSON(http.StatusOK, todo)
+}
+
+func (s *Server) All(c *gin.Context) {
+	todos, err := s.todoService.All()
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+			"object":  "error",
+			"message": fmt.Sprintf("db: query error: %s", err),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, todos)
+}
+
+func (s *Server) Create(c *gin.Context) {
+	// var todo Todo
+	// err := c.ShouldBindJSON(&todo)
+	// if err != nil {
+	// 	c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
+	// 		"object":  "error",
+	// 		"message": fmt.Sprintf("json: wrong params: %s", err),
+	// 	})
+	// 	return
+	// }
+	// now := time.Now()
+	// todo.CreatedAt = now
+	// todo.UpdatedAt = now
+	// row := s.db.QueryRow("INSERT INTO todos (todo, created_at, updated_at) values ($1, $2, $3) RETURNING id", todo.Body, now, now)
+
+	// if err := row.Scan(&todo.ID); err != nil {
+	// 	c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+	// 		"object":  "error",
+	// 		"message": fmt.Sprintf("db: query error: %s", err),
+	// 	})
+	// 	return
+	// }
+
+	// c.JSON(http.StatusCreated, todo)
+
+	var todo Todo
+	err := c.ShouldBindJSON(&todo)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
+			"object":  "error",
+			"message": fmt.Sprintf("json: wrong params: %s", err),
+		})
+		return
+	}
+
+	if err := s.todoService.Create(&todo); err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+		return
+	}
+
+	c.JSON(http.StatusCreated, todo)
+}
+
+func (s *Server) Update(c *gin.Context) {
+
+	// h := gin.H{}
+	// if err := c.ShouldBindJSON(&h); err != nil {
+	// 	c.AbortWithStatusJSON(http.StatusBadRequest, err)
+	// 	return
+	// }
+	// id, _ := strconv.Atoi(c.Param("id"))
+	// stmt := "UPDATE todos SET todo = $2 WHERE id = $1"
+	// _, err := s.db.Exec(stmt, id, h["todo"])
+	// if err != nil {
+	// 	c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+	// 	return
+	// }
+	// stmt = "SELECT id, todo, created_at, updated_at FROM todos WHERE id = $1"
+	// row := s.db.QueryRow(stmt, id)
+	// var todo Todo
+	// err = row.Scan(&todo.ID, &todo.Body, &todo.CreatedAt, &todo.UpdatedAt)
+	// if err != nil {
+	// 	c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+	// 	return
+	// }
+	// c.JSON(http.StatusOK, todo)
+
+	h := map[string]string{}
+	if err := c.ShouldBindJSON(&h); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, err)
+		return
+	}
+	id, _ := strconv.Atoi(c.Param("id"))
+	todo, err := s.todoService.Update(id, h["todo"])
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+		return
+	}
+	c.JSON(http.StatusOK, todo)
+}
+
+func (s *Server) DeleteByID(c *gin.Context) {
+	// stmt := "DELETE FROM todos WHERE id = $1"
+	// id, _ := strconv.Atoi(c.Param("id"))
+	// _, err := s.db.Exec(stmt, id)
+	// if err != nil {
+	// 	c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+	// 	return
+	// }
+
+	id, _ := strconv.Atoi(c.Param("id"))
+	if err := s.todoService.DeleteByID(id); err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+		return
+	}
+}
+
 type TodoServiceImp struct {
 	db *sql.DB
 }
@@ -83,142 +213,48 @@ func (s *TodoServiceImp) Update(id int, body string) (*Todo, error) {
 	return s.FindByID(id)
 }
 
-type Server struct {
-	db      *sql.DB
-	service TodoService
-}
-
 type Todo struct {
 	ID        int64     `json:"id"`
-	Body      string    `json:"todo"`
+	Body      string    `json:"todo" binding:"required"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-func (s *Server) FindByID(c *gin.Context) {
-	id := c.Param("id")
-	queryStmt := "SELECT id, todo, updated_at, created_at FROM todos where id=$1"
-	row := s.db.QueryRow(queryStmt, id)
-	var todo Todo
-	err := row.Scan(&todo.ID, &todo.Body, &todo.UpdatedAt, &todo.CreatedAt)
-	if err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
-			"object":  "error",
-			"message": fmt.Sprintf("db: query error: %s", err),
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, todo)
+type Secret struct {
+	ID  int64  `json:"id"`
+	Key string `json:"key" binding:"required"`
 }
 
-func (s *Server) All(c *gin.Context) {
-	todos, err := s.service.All()
-	if err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
-			"object":  "error",
-			"message": fmt.Sprintf("db: query error: %s", err),
-		})
-		return
-	}
-	c.JSON(http.StatusOK, todos)
+type SecretService interface {
+	Insert(s *Secret) error
+}
+type SecretServiceImp struct {
+	db *sql.DB
 }
 
-func (s *Server) Create(c *gin.Context) {
-	// var todo Todo
-	// err := c.ShouldBindJSON(&todo)
-	// if err != nil {
-	// 	c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
-	// 		"object":  "error",
-	// 		"message": fmt.Sprintf("json: wrong params: %s", err),
-	// 	})
-	// 	return
-	// }
-	// now := time.Now()
-	// todo.CreatedAt = now
-	// todo.UpdatedAt = now
-	// row := s.db.QueryRow("INSERT INTO todos (todo, created_at, updated_at) values ($1, $2, $3) RETURNING id", todo.Body, now, now)
-
-	// if err := row.Scan(&todo.ID); err != nil {
-	// 	c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
-	// 		"object":  "error",
-	// 		"message": fmt.Sprintf("db: query error: %s", err),
-	// 	})
-	// 	return
-	// }
-
-	// c.JSON(http.StatusCreated, todo)
-
-	var todo Todo
-	err := c.ShouldBindJSON(&todo)
-	if err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
-			"object":  "error",
-			"message": fmt.Sprintf("json: wrong params: %s", err),
-		})
-		return
+func (s *SecretServiceImp) Insert(secret *Secret) error {
+	row := s.db.QueryRow("INSERT INTO secrets (key) values ($1) RETURNING id", secret.Key)
+	if err := row.Scan(&secret.ID); err != nil {
+		return err
 	}
-
-	if err := s.service.Create(&todo); err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
-		return
-	}
-
-	c.JSON(http.StatusCreated, todo)
+	return nil
 }
 
-func (s *Server) Update(c *gin.Context) {
-
-	// h := gin.H{}
-	// if err := c.ShouldBindJSON(&h); err != nil {
-	// 	c.AbortWithStatusJSON(http.StatusBadRequest, err)
-	// 	return
-	// }
-	// id, _ := strconv.Atoi(c.Param("id"))
-	// stmt := "UPDATE todos SET todo = $2 WHERE id = $1"
-	// _, err := s.db.Exec(stmt, id, h["todo"])
-	// if err != nil {
-	// 	c.AbortWithStatusJSON(http.StatusInternalServerError, err)
-	// 	return
-	// }
-	// stmt = "SELECT id, todo, created_at, updated_at FROM todos WHERE id = $1"
-	// row := s.db.QueryRow(stmt, id)
-	// var todo Todo
-	// err = row.Scan(&todo.ID, &todo.Body, &todo.CreatedAt, &todo.UpdatedAt)
-	// if err != nil {
-	// 	c.AbortWithStatusJSON(http.StatusInternalServerError, err)
-	// 	return
-	// }
-	// c.JSON(http.StatusOK, todo)
-
-	h := map[string]string{}
-	if err := c.ShouldBindJSON(&h); err != nil {
+func (s *Server) CreateSecret(c *gin.Context) {
+	var secret Secret
+	if err := c.ShouldBindJSON(&secret); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, err)
 		return
 	}
-	id, _ := strconv.Atoi(c.Param("id"))
-	todo, err := s.service.Update(id, h["todo"])
-	if err != nil {
+	if err := s.secretService.Insert(&secret); err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
 		return
 	}
-	c.JSON(http.StatusOK, todo)
+	c.JSON(http.StatusCreated, secret)
 }
 
-func (s *Server) DeleteByID(c *gin.Context) {
-	// stmt := "DELETE FROM todos WHERE id = $1"
-	// id, _ := strconv.Atoi(c.Param("id"))
-	// _, err := s.db.Exec(stmt, id)
-	// if err != nil {
-	// 	c.AbortWithStatusJSON(http.StatusInternalServerError, err)
-	// 	return
-	// }
+func (s *Server) AuthTodo(c *gin.Context) {
 
-	id, _ := strconv.Atoi(c.Param("id"))
-	if err := s.service.DeleteByID(id); err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
-		return
-	}
 }
 
 func main() {
@@ -247,8 +283,18 @@ func main() {
 	// 	db: db,
 	// }
 
+	// s := &Server{
+	// 	service: &TodoServiceImp{
+	// 		db: db,
+	// 	},
+	// }
+
 	s := &Server{
-		service: &TodoServiceImp{
+		db: db,
+		todoService: &TodoServiceImp{
+			db: db,
+		},
+		secretService: &SecretServiceImp{
 			db: db,
 		},
 	}
@@ -276,11 +322,15 @@ func SetupRoute(s *Server) *gin.Engine {
 	// 	}
 	// 	c.AbortWithStatus(http.StatusUnauthorized)
 	// })
-
+	todos.Use(s.AuthTodo)
 	todos.GET("/todos", s.All)
 	todos.POST("/todos", s.Create)
 	todos.GET("/todos/:id", s.FindByID)
 	todos.PUT("/todos/:id", s.Update)
 	todos.DELETE("/todos/:id", s.DeleteByID)
+
+	// curl -XPOST http://localhost:8000/admin/secrets
+	//  -u admin:1234 -d '{"key": "foobar"}
+	r.POST("/admin/secrets", s.CreateSecret)
 	return r
 }
