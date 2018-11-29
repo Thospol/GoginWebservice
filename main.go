@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -13,7 +14,33 @@ import (
 )
 
 type Server struct {
+	db      *sql.DB
+	service TodoService
+}
+
+type TodoService interface {
+	All() ([]Todo, error)
+}
+
+type TodoServiceImp struct {
 	db *sql.DB
+}
+
+func (s *TodoServiceImp) All() ([]Todo, error) {
+	rows, err := s.db.Query("SELECT id, todo, updated_at, created_at FROM todos")
+	if err != nil {
+		return nil, err
+	}
+	todos := []Todo{} // set empty slice without nil
+	for rows.Next() {
+		var todo Todo
+		err := rows.Scan(&todo.ID, &todo.Body, &todo.UpdatedAt, &todo.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		todos = append(todos, todo)
+	}
+	return todos, nil
 }
 
 type Todo struct {
@@ -41,26 +68,36 @@ func (s *Server) FindByID(c *gin.Context) {
 }
 
 func (s *Server) All(c *gin.Context) {
-	rows, err := s.db.Query("SELECT id, todo, updated_at, created_at FROM todos")
+	// rows, err := s.db.Query("SELECT id, todo, updated_at, created_at FROM todos")
+	// if err != nil {
+	// 	c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+	// 		"object":  "error",
+	// 		"message": fmt.Sprintf("db: query error: %s", err),
+	// 	})
+	// 	return
+	// }
+	// todos := []Todo{} // set empty slice without nil
+	// for rows.Next() {
+	// 	var todo Todo
+	// 	err := rows.Scan(&todo.ID, &todo.Body, &todo.UpdatedAt, &todo.CreatedAt)
+	// 	if err != nil {
+	// 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+	// 			"object":  "error",
+	// 			"message": fmt.Sprintf("db: query error: %s", err),
+	// 		})
+	// 		return
+	// 	}
+	// 	todos = append(todos, todo)
+	// }
+	// c.JSON(http.StatusOK, todos)
+
+	todos, err := s.service.All()
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 			"object":  "error",
 			"message": fmt.Sprintf("db: query error: %s", err),
 		})
 		return
-	}
-	todos := []Todo{} // set empty slice without nil
-	for rows.Next() {
-		var todo Todo
-		err := rows.Scan(&todo.ID, &todo.Body, &todo.UpdatedAt, &todo.CreatedAt)
-		if err != nil {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
-				"object":  "error",
-				"message": fmt.Sprintf("db: query error: %s", err),
-			})
-			return
-		}
-		todos = append(todos, todo)
 	}
 	c.JSON(http.StatusOK, todos)
 }
@@ -91,6 +128,40 @@ func (s *Server) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, todo)
 }
 
+func (s *Server) Update(c *gin.Context) {
+	h := gin.H{}
+	if err := c.ShouldBindJSON(&h); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, err)
+		return
+	}
+	id, _ := strconv.Atoi(c.Param("id"))
+	stmt := "UPDATE todos SET todo = $2 WHERE id = $1"
+	_, err := s.db.Exec(stmt, id, h["todo"])
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+		return
+	}
+	stmt = "SELECT id, todo, created_at, updated_at FROM todos WHERE id = $1"
+	row := s.db.QueryRow(stmt, id)
+	var todo Todo
+	err = row.Scan(&todo.ID, &todo.Body, &todo.CreatedAt, &todo.UpdatedAt)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+		return
+	}
+	c.JSON(http.StatusOK, todo)
+}
+
+func (s *Server) DeleteByID(c *gin.Context) {
+	stmt := "DELETE FROM todos WHERE id = $1"
+	id, _ := strconv.Atoi(c.Param("id"))
+	_, err := s.db.Exec(stmt, id)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, err)
+		return
+	}
+}
+
 func main() {
 	db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
 	if err != nil {
@@ -111,10 +182,17 @@ func main() {
 	s := &Server{
 		db: db,
 	}
+
+	r := SetupRoute(s)
+	r.Run(":" + os.Getenv("PORT"))
+}
+
+func SetupRoute(s *Server) *gin.Engine {
 	r := gin.Default()
 	r.GET("/todos", s.All)
 	r.POST("/todos", s.Create)
 	r.GET("/todos/:id", s.FindByID)
-
-	r.Run(":" + os.Getenv("PORT"))
+	r.PUT("/todos/:id", s.Update)
+	r.DELETE("/todos/:id", s.DeleteByID)
+	return r
 }
