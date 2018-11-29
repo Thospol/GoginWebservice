@@ -20,6 +20,7 @@ type Server struct {
 
 type TodoService interface {
 	All() ([]Todo, error)
+	Create()
 }
 
 type TodoServiceImp struct {
